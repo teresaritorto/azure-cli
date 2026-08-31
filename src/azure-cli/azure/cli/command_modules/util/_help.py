@@ -26,7 +26,7 @@ examples:
 - name: Get Audit log through Microsoft Graph
   text: >
       az rest --method get --url https://graph.microsoft.com/beta/auditLogs/directoryAudits
-- name: Update a Azure Active Directory Graph User's display name
+- name: Update an Azure Active Directory Graph User's display name
   text: |
       (Bash or CMD)
       az rest --method patch --url "https://graph.microsoft.com/v1.0/users/johndoe@azuresdkteam.onmicrosoft.com" --body "{\\"displayName\\": \\"johndoe2\\"}"
@@ -55,40 +55,4 @@ short-summary: Show the versions of Azure CLI modules and extensions in JSON for
 helps['upgrade'] = """
 type: command
 short-summary: Upgrade Azure CLI and extensions
-"""
-
-helps['demo'] = """
-type: group
-short-summary: Demos for designing, developing and demonstrating Azure CLI.
-"""
-
-helps['demo style'] = """
-type: command
-short-summary: A demo showing supported text styles.
-"""
-
-helps['demo secret-store'] = """
-type: group
-short-summary: A demo showing how to use secret store.
-"""
-
-helps['demo secret-store save'] = """
-type: command
-short-summary: Save custom data to secret store.
-examples:
-- name: Save data to secret store.
-  text: az demo secret-store save "name=Johann Sebastian Bach" job=musician
-"""
-
-helps['demo secret-store load'] = """
-type: command
-short-summary: Load custom data from secret store.
-"""
-
-helps['demo byo-access-token'] = """
-type: command
-short-summary: List resource groups by bringing your own access token
-examples:
-- name: List resource groups by bringing your own access token
-  text: az demo byo-access-token --access-token "eyJ0eXAiO..." --subscription-id 00000000-0000-0000-0000-000000000000
 """

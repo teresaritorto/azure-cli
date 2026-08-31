@@ -54,6 +54,7 @@ def _postgres_parse_list_capability(result, is_offer_restriction_check_required=
     zone_redundant = [feature for feature in supported_features if feature.name == "ZoneRedundantHa"]
     geo_backup = [feature for feature in supported_features if feature.name == "GeoBackup"]
     autonomous_tuning = [feature for feature in supported_features if feature.name == "IndexTuning"]
+    online_resize = [feature for feature in supported_features if feature.name == "OnlineResize"]
 
     # Update once capability calls are corrected for each command
     if restricted == "Enabled" and not is_offer_restriction_check_required:
@@ -65,7 +66,7 @@ def _postgres_parse_list_capability(result, is_offer_restriction_check_required=
     single_az = zone_redundant[0].status != "Enabled" if zone_redundant else True
     geo_backup_supported = geo_backup[0].status == "Enabled" if geo_backup else False
     autonomous_tuning_supported = autonomous_tuning[0].status == "Enabled" if autonomous_tuning else False
-
+    online_resize_supported = online_resize[0].status == "Enabled" if online_resize else False
     tiers = result[0].supported_server_editions
     tiers_dict = {}
     for tier_info in tiers:
@@ -94,6 +95,7 @@ def _postgres_parse_list_capability(result, is_offer_restriction_check_required=
                 tier_dict["supported_storageV2_throughput"] = storage_edition.supported_storage_mb[0].supported_throughput
                 tier_dict["supported_storageV2_throughput_max"] = storage_edition.supported_storage_mb[0].supported_maximum_throughput
 
+        tier_dict["default_sku_name"] = tier_info.default_sku_name
         tier_dict["skus"] = skus
         tier_dict["storage_sizes"] = storage_sizes
         tiers_dict[tier_name] = tier_dict
@@ -113,7 +115,8 @@ def _postgres_parse_list_capability(result, is_offer_restriction_check_required=
         'zones': zones,
         'server_versions': versions,
         'supported_server_versions': supported_server_versions,
-        'autonomous_tuning_supported': autonomous_tuning_supported
+        'autonomous_tuning_supported': autonomous_tuning_supported,
+        'online_resize_supported': online_resize_supported
     }
 
 

@@ -20,7 +20,7 @@ class Wait(AAZWaitCommand):
 
     _aaz_info = {
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.netapp/netappaccounts/{}/capacitypools/{}/volumes/{}", "2025-12-01"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.netapp/netappaccounts/{}/capacitypools/{}/volumes/{}", "2026-05-01"],
         ]
     }
 
@@ -149,7 +149,7 @@ class Wait(AAZWaitCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2025-12-01",
+                    "api-version", "2026-05-01",
                     required=True,
                 ),
             }
@@ -225,6 +225,9 @@ class Wait(AAZWaitCommand):
             properties.baremetal_tenant_id = AAZStrType(
                 serialized_name="baremetalTenantId",
                 flags={"read_only": True},
+            )
+            properties.breakthrough_mode = AAZStrType(
+                serialized_name="breakthroughMode",
             )
             properties.capacity_pool_resource_id = AAZStrType(
                 serialized_name="capacityPoolResourceId",
@@ -451,6 +454,22 @@ class Wait(AAZWaitCommand):
             )
             replication.endpoint_type = AAZStrType(
                 serialized_name="endpointType",
+                flags={"read_only": True},
+            )
+            replication.external_replication_setup_info = AAZStrType(
+                serialized_name="externalReplicationSetupInfo",
+                flags={"read_only": True},
+            )
+            replication.external_replication_setup_status = AAZStrType(
+                serialized_name="externalReplicationSetupStatus",
+                flags={"read_only": True},
+            )
+            replication.mirror_state = AAZStrType(
+                serialized_name="mirrorState",
+                flags={"read_only": True},
+            )
+            replication.relationship_status = AAZStrType(
+                serialized_name="relationshipStatus",
                 flags={"read_only": True},
             )
             replication.remote_path = AAZObjectType(

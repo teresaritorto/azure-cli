@@ -17,11 +17,25 @@ from azure.cli.core.util import \
     (get_file_json, truncate_text, shell_safe_json_parse, b64_to_hex, hash_string, random_string,
      open_page_in_browser, can_launch_browser, handle_exception, ConfiguredDefaultSetter, send_raw_request,
      should_disable_connection_verify, parse_proxy_resource_id, get_az_user_agent, get_az_rest_user_agent,
-    _get_parent_proc_name, is_wsl, run_cmd, run_az_cmd, roughly_parse_command)
+    _get_parent_proc_name, is_wsl, run_cmd, run_az_cmd, roughly_parse_command, is_same_origin)
 from azure.cli.core.mock import DummyCli
 
 
 class TestUtils(unittest.TestCase):
+
+    def _assert_headers(self, request_headers, expected_headers):
+        actual_headers = dict(request_headers)
+
+        encodings = {
+            encoding.strip().lower()
+            for encoding in actual_headers.get('Accept-Encoding', '').split(',')
+            if encoding.strip()
+        }
+        self.assertIn('gzip', encodings)
+        self.assertIn('deflate', encodings)
+
+        actual_headers.pop('Accept-Encoding', None)
+        self.assertDictEqual(actual_headers, expected_headers)
 
     def test_load_json_from_file(self):
         _, pathname = tempfile.mkstemp()
@@ -257,7 +271,6 @@ class TestUtils(unittest.TestCase):
 
         expected_header = {
             'User-Agent': get_az_rest_user_agent(),
-            'Accept-Encoding': 'gzip, deflate',
             'Accept': '*/*',
             'Connection': 'keep-alive',
             'Content-Type': 'application/json',
@@ -282,7 +295,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(request.url, 'https://myaccount.blob.core.windows.net/mycontainer/myblob?timeout=30&sv=2019-02-02&srt=s&ss=bf')
         self.assertEqual(request.body, '{"b1": "v1"}')
         # Verify no Authorization header
-        self.assertDictEqual(dict(request.headers), expected_header)
+        self._assert_headers(request.headers, expected_header)
         self.assertEqual(send_mock.call_args[1]["verify"], not should_disable_connection_verify())
 
         # Test Authorization header is skipped
@@ -291,7 +304,7 @@ class TestUtils(unittest.TestCase):
 
         get_raw_token_mock.assert_not_called()
         request = send_mock.call_args[0][1]
-        self.assertDictEqual(dict(request.headers), expected_header)
+        self._assert_headers(request.headers, expected_header)
 
         # Test Authorization header is already provided
         send_raw_request(cli_ctx, 'GET', full_arm_rest_url,
@@ -300,7 +313,7 @@ class TestUtils(unittest.TestCase):
 
         get_raw_token_mock.assert_not_called()
         request = send_mock.call_args[0][1]
-        self.assertDictEqual(dict(request.headers), {**expected_header, 'Authorization': 'Basic ABCDE'})
+        self._assert_headers(request.headers, {**expected_header, 'Authorization': 'Basic ABCDE'})
 
         # Test Authorization header is auto appended
         send_raw_request(cli_ctx, 'GET', full_arm_rest_url,
@@ -309,7 +322,7 @@ class TestUtils(unittest.TestCase):
 
         get_raw_token_mock.assert_called_with(mock.ANY, test_arm_active_directory_resource_id, subscription=subscription_id)
         request = send_mock.call_args[0][1]
-        self.assertDictEqual(dict(request.headers), expected_header_with_auth)
+        self._assert_headers(request.headers, expected_header_with_auth)
 
         # Test ARM Subscriptions - List
         # https://learn.microsoft.com/en-us/rest/api/resources/subscriptions/list
@@ -320,7 +333,7 @@ class TestUtils(unittest.TestCase):
         get_raw_token_mock.assert_called_with(mock.ANY, test_arm_active_directory_resource_id)
         request = send_mock.call_args[0][1]
         self.assertEqual(request.url, test_arm_endpoint.rstrip('/') + '/subscriptions?api-version=2020-01-01')
-        self.assertDictEqual(dict(request.headers), expected_header_with_auth)
+        self._assert_headers(request.headers, expected_header_with_auth)
 
         # Test ARM Tenants - List
         # https://learn.microsoft.com/en-us/rest/api/resources/tenants/list
@@ -331,7 +344,7 @@ class TestUtils(unittest.TestCase):
         get_raw_token_mock.assert_called_with(mock.ANY, test_arm_active_directory_resource_id)
         request = send_mock.call_args[0][1]
         self.assertEqual(request.url, test_arm_endpoint.rstrip('/') + '/tenants?api-version=2020-01-01')
-        self.assertDictEqual(dict(request.headers), expected_header_with_auth)
+        self._assert_headers(request.headers, expected_header_with_auth)
 
         # Test ARM resource ID
         # /subscriptions/00000001-0000-0000-0000-000000000000/resourcegroups/02?api-version=2019-07-01
@@ -341,7 +354,7 @@ class TestUtils(unittest.TestCase):
         get_raw_token_mock.assert_called_with(mock.ANY, test_arm_active_directory_resource_id, subscription=subscription_id)
         request = send_mock.call_args[0][1]
         self.assertEqual(request.url, full_arm_rest_url)
-        self.assertDictEqual(dict(request.headers), expected_header_with_auth)
+        self._assert_headers(request.headers, expected_header_with_auth)
 
         # Test full ARM URL
         # https://management.azure.com/subscriptions/00000001-0000-0000-0000-000000000000/resourcegroups/02?api-version=2019-07-01
@@ -360,6 +373,17 @@ class TestUtils(unittest.TestCase):
         get_raw_token_mock.assert_called_with(mock.ANY, test_arm_active_directory_resource_id, subscription=subscription_id)
         request = send_mock.call_args[0][1]
         self.assertEqual(request.url, 'https://management.azure.com:443/subscriptions/00000001-0000-0000-0000-000000000000/resourcegroups/02?api-version=2019-07-01')
+
+        # Test lookalike host is NOT mistaken for the trusted ARM endpoint via prefix matching.
+        # The access token must NOT be attached to an attacker-controlled origin.
+        for spoofed_host in ['https://management.azure.com.attacker', 'https://management.azure.com@attacker']:
+            spoofed_url = spoofed_host + arm_resource_id
+            get_raw_token_mock.reset_mock()
+            send_raw_request(cli_ctx, 'GET', spoofed_url, generated_client_request_id_name=None)
+            get_raw_token_mock.assert_not_called()
+            request = send_mock.call_args[0][1]
+
+            self.assertNotIn('Authorization', request.headers)
 
         # Test non-ARM APIs
 
@@ -386,6 +410,86 @@ class TestUtils(unittest.TestCase):
             get_raw_token_mock.assert_called_with(mock.ANY, test_arm_active_directory_resource_id, subscription=subscription_id)
             request = send_mock.call_args[0][1]
             self.assertEqual(request.headers['User-Agent'], get_az_rest_user_agent() + ' env-ua ARG-UA')
+
+    def test_is_same_origin(self):
+        endpoint = 'https://management.azure.com/'
+
+        # Same origin
+        self.assertTrue(is_same_origin('https://management.azure.com/subscriptions/01?api-version=2025-09-01', endpoint))
+        self.assertTrue(is_same_origin('https://management.azure.com', endpoint))
+        # Case-insensitive scheme and host
+        self.assertTrue(is_same_origin('HTTPS://Management.Azure.Com/path', endpoint))
+        # Default port is equivalent to an omitted port
+        self.assertTrue(is_same_origin('https://management.azure.com:443/path', endpoint))
+        self.assertTrue(is_same_origin('https://management.azure.com/path', 'https://management.azure.com:443/'))
+
+        # Prefix-matching attack: lookalike host must NOT match
+        self.assertFalse(is_same_origin('https://management.azure.com.attacker/path', endpoint))
+        self.assertFalse(is_same_origin('https://management.azure.com.attacker', endpoint))
+        # Userinfo trick: real host is the attacker
+        self.assertFalse(is_same_origin('https://management.azure.com@attacker/path', endpoint))
+        # Different scheme
+        self.assertFalse(is_same_origin('http://management.azure.com/path', endpoint))
+        # Different port
+        self.assertFalse(is_same_origin('https://management.azure.com:8443/path', endpoint))
+        # Different host
+        self.assertFalse(is_same_origin('https://graph.microsoft.com/path', endpoint))
+
+        # Malformed / non-URL inputs
+        self.assertFalse(is_same_origin('not a url', endpoint))
+        self.assertFalse(is_same_origin('', endpoint))
+        self.assertFalse(is_same_origin('https://management.azure.com/path', 'not a url'))
+
+    def test_normalize_url(self):
+        from azure.cli.core.util import normalize_url
+
+        # Already normalized URLs are unchanged
+        for url in ['https://management.azure.com/',
+                    'https://management.azure.com/subscriptions/01/resourceGroups/rg?api-version=2021-04-01']:
+            self.assertEqual(normalize_url(url), url)
+
+        # Empty path is normalized to '/'
+        self.assertEqual(normalize_url('https://management.azure.com'), 'https://management.azure.com/')
+        # Scheme and host are lowercased
+        self.assertEqual(normalize_url('HTTPS://Management.Azure.COM/Path'), 'https://management.azure.com/Path')
+        # Empty segments are collapsed, so the path can't be read as a protocol-relative URL
+        self.assertEqual(normalize_url('https://management.azure.com//attacker.example/leak'),
+                         'https://management.azure.com/attacker.example/leak')
+        # Dot segments are removed
+        self.assertEqual(normalize_url('https://management.azure.com/a/b/../c'),
+                         'https://management.azure.com/a/c')
+        self.assertEqual(normalize_url('https://management.azure.com/../..//attacker.example/leak'),
+                         'https://management.azure.com/attacker.example/leak')
+        # Backslashes in the authority belong to the path, like in WHATWG URL parsers
+        self.assertEqual(normalize_url('https://management.azure.com\\@attacker.example/leak'),
+                         'https://management.azure.com/@attacker.example/leak')
+        # Control characters are stripped
+        self.assertEqual(normalize_url('https://management.azure.com\t\r\n/path'),
+                         'https://management.azure.com/path')
+        # Percent-encoded characters are preserved as-is
+        self.assertEqual(normalize_url('https://management.azure.com/a%20b'),
+                         'https://management.azure.com/a%20b')
+        # A literal space inside the URL is preserved, only leading/trailing whitespace is trimmed
+        self.assertEqual(normalize_url('  https://management.azure.com/a b  '),
+                         'https://management.azure.com/a b')
+        # Query and fragment are preserved
+        self.assertEqual(normalize_url('https://management.azure.com/a//b?x=1//2#f//g'),
+                         'https://management.azure.com/a/b?x=1//2#f//g')
+
+    def test_is_trusted_cloud_endpoint(self):
+        from azure.cli.core.util import is_trusted_cloud_endpoint
+        from azure.cli.core.mock import DummyCli
+
+        cli_ctx = DummyCli()
+
+        self.assertTrue(is_trusted_cloud_endpoint(
+            'https://management.azure.com/subscriptions/01?api-version=2025-09-01', cli_ctx))
+        # Not a trusted host
+        self.assertFalse(is_trusted_cloud_endpoint('https://management.azure.com.attacker/path', cli_ctx))
+        # Not normalized: the path may be re-interpreted as an authority downstream
+        self.assertFalse(is_trusted_cloud_endpoint('https://management.azure.com//attacker.example/leak', cli_ctx))
+        self.assertFalse(is_trusted_cloud_endpoint('https://management.azure.com/../..//attacker.example', cli_ctx))
+        self.assertFalse(is_trusted_cloud_endpoint(None, cli_ctx))
 
     @mock.patch("psutil.Process")
     def test_get_parent_proc_name(self, mock_process_type):

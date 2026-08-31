@@ -16,9 +16,9 @@ class Update(AAZCommand):
     """
 
     _aaz_info = {
-        "version": "2025-04-01",
+        "version": "2026-04-01",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.compute/virtualmachinescalesets/{}", "2025-04-01"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.compute/virtualmachinescalesets/{}", "2026-04-01"],
         ]
     }
 
@@ -241,6 +241,12 @@ class Update(AAZCommand):
             help="When Overprovision is enabled, extensions are launched only on the requested number of VMs which are finally kept. This property will hence ensure that the extensions do not run on the extra overprovisioned VMs.",
             nullable=True,
         )
+        _args_schema.external_health_policy = AAZObjectArg(
+            options=["--external-health-policy"],
+            arg_group="Properties",
+            help="Specifies the external health policy for the virtual machine scale set.",
+            nullable=True,
+        )
         _args_schema.high_speed_interconnect_placement = AAZStrArg(
             options=["--high-speed-interconnect-placement"],
             arg_group="Properties",
@@ -255,6 +261,12 @@ class Update(AAZCommand):
             nullable=True,
         )
         cls._build_args_sub_resource_update(_args_schema.host_group)
+        _args_schema.lifecycle_hooks_profile = AAZObjectArg(
+            options=["--lifecycle-hooks-profile"],
+            arg_group="Properties",
+            help="Specifies the lifecycle hooks profile for the virtual machine scale set.",
+            nullable=True,
+        )
         _args_schema.orchestration_mode = AAZStrArg(
             options=["--orchestration-mode"],
             arg_group="Properties",
@@ -340,7 +352,7 @@ class Update(AAZCommand):
             arg_group="Properties",
             help="Specifies the align mode between Virtual Machine Scale Set compute and storage Fault Domain count.",
             nullable=True,
-            enum={"Aligned": "Aligned", "Unaligned": "Unaligned"},
+            enum={"Aligned": "Aligned", "BestEffortAligned": "BestEffortAligned", "Unaligned": "Unaligned"},
         )
         _args_schema.zone_balance = AAZBoolArg(
             options=["--zone-balance"],
@@ -384,6 +396,54 @@ class Update(AAZCommand):
             enum={"Reimage": "Reimage", "Replace": "Replace", "Restart": "Restart"},
         )
 
+        external_health_policy = cls._args_schema.external_health_policy
+        external_health_policy.enabled = AAZBoolArg(
+            options=["enabled"],
+            help="If true, external health is enabled for this scale set. Cannot be set to true on instances where another health monitoring source is active (ApplicationHealth extension or SLB). Defaults to false.",
+            nullable=True,
+        )
+        external_health_policy.expiry_duration = AAZDurationArg(
+            options=["expiry-duration"],
+            help="Defines how long the health status set by External Health API will last on the VM. If a signal is not received/updated within this time, the VM Health will be marked as \"unknown\". Uses the ISO 8601 format. Minimum: 5 minutes (PT5M), Maximum: 3 hours (PT3H).",
+            nullable=True,
+        )
+        external_health_policy.grace_period = AAZDurationArg(
+            options=["grace-period"],
+            help="Grace period for newly created VMs or when the External Health policy is first applied on VMSS. Uses the ISO 8601 format. Minimum: 5 minutes (PT5M), Maximum: 4 hours (PT4H).",
+            nullable=True,
+        )
+
+        lifecycle_hooks_profile = cls._args_schema.lifecycle_hooks_profile
+        lifecycle_hooks_profile.lifecycle_hooks = AAZListArg(
+            options=["lifecycle-hooks"],
+            help="Specifies the lifecycle hooks configured for the virtual machine scale set.",
+            nullable=True,
+        )
+
+        lifecycle_hooks = cls._args_schema.lifecycle_hooks_profile.lifecycle_hooks
+        lifecycle_hooks.Element = AAZObjectArg(
+            nullable=True,
+        )
+
+        _element = cls._args_schema.lifecycle_hooks_profile.lifecycle_hooks.Element
+        _element.default_action = AAZStrArg(
+            options=["default-action"],
+            help="Specifies the action that will be applied to a target resource in the virtual machine scale set lifecycle hook event if the platform does not receive a response from the customer for the target resource before waitUntil.",
+            nullable=True,
+            enum={"Approve": "Approve", "Reject": "Reject"},
+        )
+        _element.type = AAZStrArg(
+            options=["type"],
+            help="Specifies the type of the lifecycle hook.",
+            nullable=True,
+            enum={"UpgradeAutoOSRollingBatchStarting": "UpgradeAutoOSRollingBatchStarting", "UpgradeAutoOSScheduling": "UpgradeAutoOSScheduling"},
+        )
+        _element.wait_duration = AAZDurationArg(
+            options=["wait-duration"],
+            help="Specifies the time duration a virtual machine scale set lifecycle hook event sent to the customer waits for a response from the customer. It should be in ISO 8601 format.",
+            nullable=True,
+        )
+
         priority_mix_policy = cls._args_schema.priority_mix_policy
         priority_mix_policy.base_regular_priority_count = AAZIntArg(
             options=["base-regular-priority-count"],
@@ -403,6 +463,11 @@ class Update(AAZCommand):
         resiliency_policy.automatic_zone_rebalancing_policy = AAZObjectArg(
             options=["automatic-zone-rebalancing-policy"],
             help="The configuration parameters used while performing automatic AZ balancing.",
+            nullable=True,
+        )
+        resiliency_policy.operation_recovery_settings = AAZObjectArg(
+            options=["operation-recovery-settings"],
+            help="The configuration parameters used for operation recovery settings.",
             nullable=True,
         )
         resiliency_policy.resilient_vm_creation_policy = AAZObjectArg(
@@ -438,6 +503,44 @@ class Update(AAZCommand):
             help="Type of rebalance strategy that will be used for rebalancing virtual machines in the scale set across availability zones. Default and only supported value for now is Recreate.",
             nullable=True,
             enum={"Recreate": "Recreate"},
+        )
+
+        operation_recovery_settings = cls._args_schema.resiliency_policy.operation_recovery_settings
+        operation_recovery_settings.reimage_recovery_policy = AAZObjectArg(
+            options=["reimage-recovery-policy"],
+            help="The configuration parameters used for reimage recovery policy.",
+            nullable=True,
+        )
+        operation_recovery_settings.restart_recovery_policy = AAZObjectArg(
+            options=["restart-recovery-policy"],
+            help="The configuration parameters used for restart recovery policy.",
+            nullable=True,
+        )
+        operation_recovery_settings.start_recovery_policy = AAZObjectArg(
+            options=["start-recovery-policy"],
+            help="The configuration parameters used for start recovery policy.",
+            nullable=True,
+        )
+
+        reimage_recovery_policy = cls._args_schema.resiliency_policy.operation_recovery_settings.reimage_recovery_policy
+        reimage_recovery_policy.enabled = AAZBoolArg(
+            options=["enabled"],
+            help="Specifies whether reimage recovery should be enabled. The default value is false.",
+            nullable=True,
+        )
+
+        restart_recovery_policy = cls._args_schema.resiliency_policy.operation_recovery_settings.restart_recovery_policy
+        restart_recovery_policy.enabled = AAZBoolArg(
+            options=["enabled"],
+            help="Specifies whether restart recovery should be enabled. The default value is false.",
+            nullable=True,
+        )
+
+        start_recovery_policy = cls._args_schema.resiliency_policy.operation_recovery_settings.start_recovery_policy
+        start_recovery_policy.enabled = AAZBoolArg(
+            options=["enabled"],
+            help="Specifies whether start recovery should be enabled. The default value is false.",
+            nullable=True,
         )
 
         resilient_vm_creation_policy = cls._args_schema.resiliency_policy.resilient_vm_creation_policy
@@ -573,9 +676,21 @@ class Update(AAZCommand):
             nullable=True,
             enum={"CapacityOptimized": "CapacityOptimized", "LowestPrice": "LowestPrice", "Prioritized": "Prioritized"},
         )
+        sku_profile.automatic_sku_migration_policy = AAZObjectArg(
+            options=["automatic-sku-migration-policy"],
+            help="Specifies the policy that controls whether the platform may automatically migrate scale set instances to a different VM size from the SKU profile depending on platform demands. When omitted, automatic SKU migration is disabled.",
+            nullable=True,
+        )
         sku_profile.vm_sizes = AAZListArg(
             options=["vm-sizes"],
             help="Specifies the VM sizes for the virtual machine scale set.",
+            nullable=True,
+        )
+
+        automatic_sku_migration_policy = cls._args_schema.sku_profile.automatic_sku_migration_policy
+        automatic_sku_migration_policy.enabled = AAZBoolArg(
+            options=["enabled"],
+            help="Specifies whether automatic SKU migration should be enabled on the virtual machine scale set. The default value is false.",
             nullable=True,
         )
 
@@ -738,6 +853,11 @@ class Update(AAZCommand):
             help="Specifies the hardware profile related details of a scale set. Minimum api-version: 2021-11-01.",
             nullable=True,
         )
+        virtual_machine_profile.interconnect_block_profile = AAZObjectArg(
+            options=["interconnect-block-profile"],
+            help="Specifies the Interconnect Block related details of a Scale Set. Minimum api-version: 2026-03-01.",
+            nullable=True,
+        )
         virtual_machine_profile.license_type = AAZStrArg(
             options=["license-type"],
             help="Specifies that the image or disk that is being used was licensed on-premises. <br><br> Possible values for Windows Server operating system are: <br><br> Windows_Client <br><br> Windows_Server <br><br> Possible values for Linux Server operating system are: <br><br> RHEL_BYOS (for RHEL) <br><br> SLES_BYOS (for SUSE) <br><br> For more information, see [Azure Hybrid Use Benefit for Windows Server](https://learn.microsoft.com/azure/virtual-machines/windows/hybrid-use-benefit-licensing) <br><br> [Azure Hybrid Use Benefit for Linux Server](https://learn.microsoft.com/azure/virtual-machines/linux/azure-hybrid-benefit-linux) <br><br> Minimum api-version: 2015-06-15",
@@ -757,7 +877,7 @@ class Update(AAZCommand):
             options=["priority"],
             help="Specifies the priority for the virtual machines in the scale set. Minimum api-version: 2017-10-30-preview.",
             nullable=True,
-            enum={"Low": "Low", "Regular": "Regular", "Spot": "Spot"},
+            enum={"Low": "Low", "Regular": "Regular", "Spot": "Spot", "SpotPlus": "SpotPlus"},
         )
         virtual_machine_profile.scheduled_events_profile = AAZObjectArg(
             options=["scheduled-events-profile"],
@@ -847,6 +967,11 @@ class Update(AAZCommand):
             nullable=True,
         )
         cls._build_args_sub_resource_update(capacity_reservation.capacity_reservation_group)
+        capacity_reservation.disable_capacity_reservation_assignment = AAZBoolArg(
+            options=["disable-capacity-reservation-assignment"],
+            help="Specifies whether the virtual machine is explicitly opted out from being associated with any capacity reservation. When set to true, the virtual machine will not be allowed to implicitly or explicitly associate with any type of capacity reservation and will consume capacity from the publicly available capacity. Minimum api-version: 2026-04-01.",
+            nullable=True,
+        )
 
         diagnostics_profile = cls._args_schema.virtual_machine_profile.diagnostics_profile
         diagnostics_profile.boot_diagnostics = AAZObjectArg(
@@ -966,6 +1091,12 @@ class Update(AAZCommand):
         )
 
         hardware_profile = cls._args_schema.virtual_machine_profile.hardware_profile
+        hardware_profile.processor_mode = AAZStrArg(
+            options=["processor-mode"],
+            help="Specifies the processor mode for the virtual machine scale set. Optional; if omitted, the platform default applies (currently Deterministic). This property can be updated on a running VMSS without deallocation or reboot. Minimum api-version: 2026-04-01.",
+            nullable=True,
+            enum={"Deterministic": "Deterministic", "Opportunistic": "Opportunistic"},
+        )
         hardware_profile.vm_size_properties = AAZObjectArg(
             options=["vm-size-properties"],
             help="Specifies the properties for customizing the size of the virtual machine. Minimum api-version: 2021-11-01. Please follow the instructions in [VM Customization](https://aka.ms/vmcustomization) for more details.",
@@ -984,6 +1115,14 @@ class Update(AAZCommand):
             nullable=True,
         )
 
+        interconnect_block_profile = cls._args_schema.virtual_machine_profile.interconnect_block_profile
+        interconnect_block_profile.interconnect_block = AAZObjectArg(
+            options=["interconnect-block"],
+            help="Specifies the Interconnect Block resource ID that should be used for allocating the Virtual Machine or Scale Set VM instances provided enough capacity has been reserved.",
+            nullable=True,
+        )
+        cls._build_args_api_entity_reference_update(interconnect_block_profile.interconnect_block)
+
         network_profile = cls._args_schema.virtual_machine_profile.network_profile
         network_profile.health_probe = AAZObjectArg(
             options=["health-probe"],
@@ -991,6 +1130,11 @@ class Update(AAZCommand):
             nullable=True,
         )
         cls._build_args_api_entity_reference_update(network_profile.health_probe)
+        network_profile.interconnect_group_profile = AAZObjectArg(
+            options=["interconnect-group-profile"],
+            help="Specifies the interconnect group profile to associate with the scale set. Minimum api-version: 2026-03-01.",
+            nullable=True,
+        )
         network_profile.network_api_version = AAZStrArg(
             options=["network-api-version"],
             help="specifies the Microsoft.Network API version used when creating networking resources in the Network Interface Configurations for Virtual Machine Scale Set with orchestration mode 'Flexible'",
@@ -1002,6 +1146,25 @@ class Update(AAZCommand):
             help="The list of network configurations.",
             nullable=True,
         )
+
+        interconnect_group_profile = cls._args_schema.virtual_machine_profile.network_profile.interconnect_group_profile
+        interconnect_group_profile.interconnect_group = AAZObjectArg(
+            options=["interconnect-group"],
+            help="Reference to the interconnect group resource.",
+            nullable=True,
+        )
+        cls._build_args_sub_resource_update(interconnect_group_profile.interconnect_group)
+        interconnect_group_profile.subgroups = AAZListArg(
+            options=["subgroups"],
+            help="The list of subgroup references within the interconnect group.",
+            nullable=True,
+        )
+
+        subgroups = cls._args_schema.virtual_machine_profile.network_profile.interconnect_group_profile.subgroups
+        subgroups.Element = AAZObjectArg(
+            nullable=True,
+        )
+        cls._build_args_sub_resource_update(subgroups.Element)
 
         network_interface_configurations = cls._args_schema.virtual_machine_profile.network_profile.network_interface_configurations
         network_interface_configurations.Element = AAZObjectArg(
@@ -1233,6 +1396,11 @@ class Update(AAZCommand):
         )
 
         _element = cls._args_schema.virtual_machine_profile.network_profile.network_interface_configurations.Element.ip_configurations.Element.public_ip_address_configuration.ip_tags.Element
+        _element.first_party_service_tag_id = AAZResourceIdArg(
+            options=["first-party-service-tag-id"],
+            help="The first party service tag resource identifier associated with the public IP address.",
+            nullable=True,
+        )
         _element.ip_tag_type = AAZStrArg(
             options=["ip-tag-type"],
             help="IP tag type. Example: FirstPartyUsage.",
@@ -1637,7 +1805,7 @@ class Update(AAZCommand):
             options=["security-type"],
             help="Specifies the SecurityType of the virtual machine. It has to be set to any specified value to enable UefiSettings. The default behavior is: UefiSettings will not be enabled unless this property is set.",
             nullable=True,
-            enum={"ConfidentialVM": "ConfidentialVM", "TrustedLaunch": "TrustedLaunch"},
+            enum={"ConfidentialVM": "ConfidentialVM", "Standard": "Standard", "TrustedLaunch": "TrustedLaunch"},
         )
         security_profile.uefi_settings = AAZObjectArg(
             options=["uefi-settings"],
@@ -1712,6 +1880,12 @@ class Update(AAZCommand):
             help="Specifies the parameters that are used to add data disks to the virtual machines in the scale set. For more information about disks, see [About disks and VHDs for Azure virtual machines](https://learn.microsoft.com/azure/virtual-machines/managed-disks-overview).",
             nullable=True,
         )
+        storage_profile.disk_api_version = AAZStrArg(
+            options=["disk-api-version"],
+            help="Specifies the Disk API version used when applying additionalDiskProperties to managed disks. The value must be in the format YYYY-MM-DD (e.g., \"2026-03-02\").",
+            nullable=True,
+            enum={"2025-01-02": "2025-01-02", "2026-03-02": "2026-03-02"},
+        )
         storage_profile.disk_controller_type = AAZStrArg(
             options=["disk-controller-type"],
             help="Specifies the disk controller type configured for the virtual machines in the scale set. Minimum api-version: 2022-08-01",
@@ -1781,6 +1955,12 @@ class Update(AAZCommand):
             options=["name"],
             help="The disk name.",
             nullable=True,
+        )
+        _element.storage_fault_domain_alignment = AAZStrArg(
+            options=["storage-fault-domain-alignment"],
+            help="Specifies the storage fault domain alignment type for the disk.",
+            nullable=True,
+            enum={"Aligned": "Aligned", "BestEffortAligned": "BestEffortAligned"},
         )
         _element.write_accelerator_enabled = AAZBoolArg(
             options=["write-accelerator-enabled"],
@@ -1875,6 +2055,12 @@ class Update(AAZCommand):
             nullable=True,
             enum={"Linux": "Linux", "Windows": "Windows"},
         )
+        os_disk.storage_fault_domain_alignment = AAZStrArg(
+            options=["storage-fault-domain-alignment"],
+            help="Specifies the storage fault domain alignment type for the disk.",
+            nullable=True,
+            enum={"Aligned": "Aligned", "BestEffortAligned": "BestEffortAligned"},
+        )
         os_disk.vhd_containers = AAZListArg(
             options=["vhd-containers"],
             help="Specifies the container urls that are used to store operating system disks for the scale set.",
@@ -1887,6 +2073,11 @@ class Update(AAZCommand):
         )
 
         diff_disk_settings = cls._args_schema.virtual_machine_profile.storage_profile.os_disk.diff_disk_settings
+        diff_disk_settings.enable_full_caching = AAZBoolArg(
+            options=["enable-full-caching"],
+            help="Specifies whether or not to enable full caching for this VM which will cache the OS disk locally on the host and make this VM more resilient to storage outages",
+            nullable=True,
+        )
         diff_disk_settings.option = AAZStrArg(
             options=["option"],
             help="Specifies the ephemeral disk settings for operating system disk.",
@@ -1962,6 +2153,7 @@ class Update(AAZCommand):
         if cls._args_host_endpoint_settings_update is not None:
             _schema.in_vm_access_control_profile_reference_id = cls._args_host_endpoint_settings_update.in_vm_access_control_profile_reference_id
             _schema.mode = cls._args_host_endpoint_settings_update.mode
+            _schema.use_local_file_rules = cls._args_host_endpoint_settings_update.use_local_file_rules
             return
 
         cls._args_host_endpoint_settings_update = AAZObjectArg(
@@ -1980,9 +2172,15 @@ class Update(AAZCommand):
             nullable=True,
             enum={"Audit": "Audit", "Disabled": "Disabled", "Enforce": "Enforce"},
         )
+        host_endpoint_settings_update.use_local_file_rules = AAZBoolArg(
+            options=["use-local-file-rules"],
+            help="When set to true, instructs the GuestProxyAgent inside the VM to load additional access control rules defined in a local file on the VM.",
+            nullable=True,
+        )
 
         _schema.in_vm_access_control_profile_reference_id = cls._args_host_endpoint_settings_update.in_vm_access_control_profile_reference_id
         _schema.mode = cls._args_host_endpoint_settings_update.mode
+        _schema.use_local_file_rules = cls._args_host_endpoint_settings_update.use_local_file_rules
 
     _args_sub_resource_update = None
 
@@ -2010,6 +2208,7 @@ class Update(AAZCommand):
     @classmethod
     def _build_args_virtual_machine_scale_set_managed_disk_parameters_update(cls, _schema):
         if cls._args_virtual_machine_scale_set_managed_disk_parameters_update is not None:
+            _schema.additional_disk_properties = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.additional_disk_properties
             _schema.disk_encryption_set = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.disk_encryption_set
             _schema.security_profile = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.security_profile
             _schema.storage_account_type = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.storage_account_type
@@ -2020,6 +2219,11 @@ class Update(AAZCommand):
         )
 
         virtual_machine_scale_set_managed_disk_parameters_update = cls._args_virtual_machine_scale_set_managed_disk_parameters_update
+        virtual_machine_scale_set_managed_disk_parameters_update.additional_disk_properties = AAZObjectArg(
+            options=["additional-disk-properties"],
+            help="Specifies additional properties for the managed disk that can be set at the time of implicit creation of the disk. This property is not captured for Restore Points.",
+            nullable=True,
+        )
         virtual_machine_scale_set_managed_disk_parameters_update.disk_encryption_set = AAZObjectArg(
             options=["disk-encryption-set"],
             help="Specifies the customer managed disk encryption set resource id for the managed disk.",
@@ -2038,6 +2242,82 @@ class Update(AAZCommand):
             enum={"PremiumV2_LRS": "PremiumV2_LRS", "Premium_LRS": "Premium_LRS", "Premium_ZRS": "Premium_ZRS", "StandardSSD_LRS": "StandardSSD_LRS", "StandardSSD_ZRS": "StandardSSD_ZRS", "Standard_LRS": "Standard_LRS", "UltraSSD_LRS": "UltraSSD_LRS"},
         )
 
+        additional_disk_properties = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.additional_disk_properties
+        additional_disk_properties.managed_disk_properties = AAZObjectArg(
+            options=["managed-disk-properties"],
+            help="Specifies the managed disk properties that can be set at the time of implicit creation of the disk.",
+            nullable=True,
+        )
+
+        managed_disk_properties = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.additional_disk_properties.managed_disk_properties
+        managed_disk_properties.availability_policy = AAZObjectArg(
+            options=["availability-policy"],
+            help="In the case of an availability or connectivity issue with the disk, specify the behavior of your VM.",
+            nullable=True,
+        )
+        managed_disk_properties.bursting_enabled = AAZBoolArg(
+            options=["bursting-enabled"],
+            help="Set to true to enable bursting beyond the provisioned performance target of the disk. Bursting is disabled by default. Does not apply to Ultra disks.",
+            nullable=True,
+        )
+        managed_disk_properties.disk_access_id = AAZStrArg(
+            options=["disk-access-id"],
+            help="Azure resource Id of the DiskAccess resource for using private endpoints on disks.",
+            nullable=True,
+        )
+        managed_disk_properties.disk_iops_read_only = AAZIntArg(
+            options=["disk-iops-read-only"],
+            help="The total number of IOPS that will be allowed across all VMs mounting the shared disk as ReadOnly. One operation can transfer between 4k and 256k bytes.",
+            nullable=True,
+        )
+        managed_disk_properties.disk_m_bps_read_only = AAZIntArg(
+            options=["disk-m-bps-read-only"],
+            help="The total throughput (MBps) that will be allowed across all VMs mounting the shared disk as ReadOnly. MBps means millions of bytes per second - MB here uses the ISO notation, of powers of 10.",
+            nullable=True,
+        )
+        managed_disk_properties.logical_sector_size = AAZIntArg(
+            options=["logical-sector-size"],
+            help="Logical sector size in bytes for Ultra Disks. Supported values are 512 and 4096. 4096 is the default.",
+            nullable=True,
+        )
+        managed_disk_properties.max_shares = AAZIntArg(
+            options=["max-shares"],
+            help="The maximum number of VMs that can attach to the disk at the same time. Value greater than one indicates a disk that can be mounted on multiple VMs at the same time. Applies to data disks only.",
+            nullable=True,
+            fmt=AAZIntArgFormat(
+                minimum=1,
+            ),
+        )
+        managed_disk_properties.network_access_policy = AAZStrArg(
+            options=["network-access-policy"],
+            help="Policy for accessing the disk via network.",
+            nullable=True,
+            enum={"AllowAll": "AllowAll", "AllowPrivate": "AllowPrivate", "DenyAll": "DenyAll"},
+        )
+        managed_disk_properties.optimized_for_frequent_attach = AAZBoolArg(
+            options=["optimized-for-frequent-attach"],
+            help="Setting this property to true improves reliability and performance of data disks that are frequently (more than 5 times a day) detached from one virtual machine and attached to another. This property should not be set for disks that are not detached and attached frequently as it causes the disks to not align with the fault domain of the virtual machine.",
+            nullable=True,
+        )
+        managed_disk_properties.performance_plus = AAZBoolArg(
+            options=["performance-plus"],
+            help="Set this flag to true to get a boost on the performance target of the disk deployed. This flag can only be set on disk creation time and cannot be disabled after enabled.",
+            nullable=True,
+        )
+        managed_disk_properties.tier = AAZStrArg(
+            options=["tier"],
+            help="Performance tier of the disk (e.g., P4, S10) as described here: https://azure.microsoft.com/en-us/pricing/details/managed-disks/. Does not apply to Ultra disks.",
+            nullable=True,
+        )
+
+        availability_policy = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.additional_disk_properties.managed_disk_properties.availability_policy
+        availability_policy.action_on_disk_delay = AAZStrArg(
+            options=["action-on-disk-delay"],
+            help="Determines how to handle disks with slow I/O.",
+            nullable=True,
+            enum={"AutomaticReattach": "AutomaticReattach", "None": "None"},
+        )
+
         security_profile = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.security_profile
         security_profile.disk_encryption_set = AAZObjectArg(
             options=["disk-encryption-set"],
@@ -2052,6 +2332,7 @@ class Update(AAZCommand):
             enum={"DiskWithVMGuestState": "DiskWithVMGuestState", "NonPersistedTPM": "NonPersistedTPM", "VMGuestStateOnly": "VMGuestStateOnly"},
         )
 
+        _schema.additional_disk_properties = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.additional_disk_properties
         _schema.disk_encryption_set = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.disk_encryption_set
         _schema.security_profile = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.security_profile
         _schema.storage_account_type = cls._args_virtual_machine_scale_set_managed_disk_parameters_update.storage_account_type
@@ -2134,7 +2415,7 @@ class Update(AAZCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2025-04-01",
+                    "api-version", "2026-04-01",
                     required=True,
                 ),
             }
@@ -2233,7 +2514,7 @@ class Update(AAZCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2025-04-01",
+                    "api-version", "2026-04-01",
                     required=True,
                 ),
             }
@@ -2347,8 +2628,10 @@ class Update(AAZCommand):
                 properties.set_prop("automaticRepairsPolicy", AAZObjectType, ".automatic_repairs_policy")
                 properties.set_prop("constrainedMaximumCapacity", AAZBoolType, ".constrained_maximum_capacity")
                 properties.set_prop("doNotRunExtensionsOnOverprovisionedVMs", AAZBoolType, ".do_not_run_extensions_on_overprovisioned_v_ms")
+                properties.set_prop("externalHealthPolicy", AAZObjectType, ".external_health_policy")
                 properties.set_prop("highSpeedInterconnectPlacement", AAZStrType, ".high_speed_interconnect_placement")
                 _UpdateHelper._build_schema_sub_resource_update(properties.set_prop("hostGroup", AAZObjectType, ".host_group"))
+                properties.set_prop("lifecycleHooksProfile", AAZObjectType, ".lifecycle_hooks_profile")
                 properties.set_prop("orchestrationMode", AAZStrType, ".orchestration_mode")
                 properties.set_prop("overprovision", AAZBoolType, ".overprovision")
                 properties.set_prop("platformFaultDomainCount", AAZIntType, ".platform_fault_domain_count")
@@ -2377,6 +2660,26 @@ class Update(AAZCommand):
                 automatic_repairs_policy.set_prop("gracePeriod", AAZStrType, ".grace_period")
                 automatic_repairs_policy.set_prop("repairAction", AAZStrType, ".repair_action")
 
+            external_health_policy = _builder.get(".properties.externalHealthPolicy")
+            if external_health_policy is not None:
+                external_health_policy.set_prop("enabled", AAZBoolType, ".enabled")
+                external_health_policy.set_prop("expiryDuration", AAZStrType, ".expiry_duration")
+                external_health_policy.set_prop("gracePeriod", AAZStrType, ".grace_period")
+
+            lifecycle_hooks_profile = _builder.get(".properties.lifecycleHooksProfile")
+            if lifecycle_hooks_profile is not None:
+                lifecycle_hooks_profile.set_prop("lifecycleHooks", AAZListType, ".lifecycle_hooks")
+
+            lifecycle_hooks = _builder.get(".properties.lifecycleHooksProfile.lifecycleHooks")
+            if lifecycle_hooks is not None:
+                lifecycle_hooks.set_elements(AAZObjectType, ".")
+
+            _elements = _builder.get(".properties.lifecycleHooksProfile.lifecycleHooks[]")
+            if _elements is not None:
+                _elements.set_prop("defaultAction", AAZStrType, ".default_action")
+                _elements.set_prop("type", AAZStrType, ".type")
+                _elements.set_prop("waitDuration", AAZStrType, ".wait_duration")
+
             priority_mix_policy = _builder.get(".properties.priorityMixPolicy")
             if priority_mix_policy is not None:
                 priority_mix_policy.set_prop("baseRegularPriorityCount", AAZIntType, ".base_regular_priority_count")
@@ -2385,6 +2688,7 @@ class Update(AAZCommand):
             resiliency_policy = _builder.get(".properties.resiliencyPolicy")
             if resiliency_policy is not None:
                 resiliency_policy.set_prop("automaticZoneRebalancingPolicy", AAZObjectType, ".automatic_zone_rebalancing_policy")
+                resiliency_policy.set_prop("operationRecoverySettings", AAZObjectType, ".operation_recovery_settings")
                 resiliency_policy.set_prop("resilientVMCreationPolicy", AAZObjectType, ".resilient_vm_creation_policy")
                 resiliency_policy.set_prop("resilientVMDeletionPolicy", AAZObjectType, ".resilient_vm_deletion_policy")
                 resiliency_policy.set_prop("zoneAllocationPolicy", AAZObjectType, ".zone_allocation_policy")
@@ -2394,6 +2698,24 @@ class Update(AAZCommand):
                 automatic_zone_rebalancing_policy.set_prop("enabled", AAZBoolType, ".enabled")
                 automatic_zone_rebalancing_policy.set_prop("rebalanceBehavior", AAZStrType, ".rebalance_behavior")
                 automatic_zone_rebalancing_policy.set_prop("rebalanceStrategy", AAZStrType, ".rebalance_strategy")
+
+            operation_recovery_settings = _builder.get(".properties.resiliencyPolicy.operationRecoverySettings")
+            if operation_recovery_settings is not None:
+                operation_recovery_settings.set_prop("reimageRecoveryPolicy", AAZObjectType, ".reimage_recovery_policy")
+                operation_recovery_settings.set_prop("restartRecoveryPolicy", AAZObjectType, ".restart_recovery_policy")
+                operation_recovery_settings.set_prop("startRecoveryPolicy", AAZObjectType, ".start_recovery_policy")
+
+            reimage_recovery_policy = _builder.get(".properties.resiliencyPolicy.operationRecoverySettings.reimageRecoveryPolicy")
+            if reimage_recovery_policy is not None:
+                reimage_recovery_policy.set_prop("enabled", AAZBoolType, ".enabled")
+
+            restart_recovery_policy = _builder.get(".properties.resiliencyPolicy.operationRecoverySettings.restartRecoveryPolicy")
+            if restart_recovery_policy is not None:
+                restart_recovery_policy.set_prop("enabled", AAZBoolType, ".enabled")
+
+            start_recovery_policy = _builder.get(".properties.resiliencyPolicy.operationRecoverySettings.startRecoveryPolicy")
+            if start_recovery_policy is not None:
+                start_recovery_policy.set_prop("enabled", AAZBoolType, ".enabled")
 
             resilient_vm_creation_policy = _builder.get(".properties.resiliencyPolicy.resilientVMCreationPolicy")
             if resilient_vm_creation_policy is not None:
@@ -2454,7 +2776,12 @@ class Update(AAZCommand):
             sku_profile = _builder.get(".properties.skuProfile")
             if sku_profile is not None:
                 sku_profile.set_prop("allocationStrategy", AAZStrType, ".allocation_strategy")
+                sku_profile.set_prop("automaticSkuMigrationPolicy", AAZObjectType, ".automatic_sku_migration_policy")
                 sku_profile.set_prop("vmSizes", AAZListType, ".vm_sizes")
+
+            automatic_sku_migration_policy = _builder.get(".properties.skuProfile.automaticSkuMigrationPolicy")
+            if automatic_sku_migration_policy is not None:
+                automatic_sku_migration_policy.set_prop("enabled", AAZBoolType, ".enabled")
 
             vm_sizes = _builder.get(".properties.skuProfile.vmSizes")
             if vm_sizes is not None:
@@ -2503,6 +2830,7 @@ class Update(AAZCommand):
                 virtual_machine_profile.set_prop("evictionPolicy", AAZStrType, ".eviction_policy")
                 virtual_machine_profile.set_prop("extensionProfile", AAZObjectType, ".extension_profile")
                 virtual_machine_profile.set_prop("hardwareProfile", AAZObjectType, ".hardware_profile")
+                virtual_machine_profile.set_prop("interconnectBlockProfile", AAZObjectType, ".interconnect_block_profile")
                 virtual_machine_profile.set_prop("licenseType", AAZStrType, ".license_type")
                 virtual_machine_profile.set_prop("networkProfile", AAZObjectType, ".network_profile")
                 virtual_machine_profile.set_prop("osProfile", AAZObjectType, ".os_profile")
@@ -2538,6 +2866,7 @@ class Update(AAZCommand):
             capacity_reservation = _builder.get(".properties.virtualMachineProfile.capacityReservation")
             if capacity_reservation is not None:
                 _UpdateHelper._build_schema_sub_resource_update(capacity_reservation.set_prop("capacityReservationGroup", AAZObjectType, ".capacity_reservation_group"))
+                capacity_reservation.set_prop("disableCapacityReservationAssignment", AAZBoolType, ".disable_capacity_reservation_assignment")
 
             diagnostics_profile = _builder.get(".properties.virtualMachineProfile.diagnosticsProfile")
             if diagnostics_profile is not None:
@@ -2587,6 +2916,7 @@ class Update(AAZCommand):
 
             hardware_profile = _builder.get(".properties.virtualMachineProfile.hardwareProfile")
             if hardware_profile is not None:
+                hardware_profile.set_prop("processorMode", AAZStrType, ".processor_mode")
                 hardware_profile.set_prop("vmSizeProperties", AAZObjectType, ".vm_size_properties")
 
             vm_size_properties = _builder.get(".properties.virtualMachineProfile.hardwareProfile.vmSizeProperties")
@@ -2594,11 +2924,25 @@ class Update(AAZCommand):
                 vm_size_properties.set_prop("vCPUsAvailable", AAZIntType, ".v_cp_us_available")
                 vm_size_properties.set_prop("vCPUsPerCore", AAZIntType, ".v_cp_us_per_core")
 
+            interconnect_block_profile = _builder.get(".properties.virtualMachineProfile.interconnectBlockProfile")
+            if interconnect_block_profile is not None:
+                _UpdateHelper._build_schema_api_entity_reference_update(interconnect_block_profile.set_prop("interconnectBlock", AAZObjectType, ".interconnect_block"))
+
             network_profile = _builder.get(".properties.virtualMachineProfile.networkProfile")
             if network_profile is not None:
                 _UpdateHelper._build_schema_api_entity_reference_update(network_profile.set_prop("healthProbe", AAZObjectType, ".health_probe"))
+                network_profile.set_prop("interconnectGroupProfile", AAZObjectType, ".interconnect_group_profile")
                 network_profile.set_prop("networkApiVersion", AAZStrType, ".network_api_version")
                 network_profile.set_prop("networkInterfaceConfigurations", AAZListType, ".network_interface_configurations")
+
+            interconnect_group_profile = _builder.get(".properties.virtualMachineProfile.networkProfile.interconnectGroupProfile")
+            if interconnect_group_profile is not None:
+                _UpdateHelper._build_schema_sub_resource_update(interconnect_group_profile.set_prop("interconnectGroup", AAZObjectType, ".interconnect_group"))
+                interconnect_group_profile.set_prop("subgroups", AAZListType, ".subgroups")
+
+            subgroups = _builder.get(".properties.virtualMachineProfile.networkProfile.interconnectGroupProfile.subgroups")
+            if subgroups is not None:
+                _UpdateHelper._build_schema_sub_resource_update(subgroups.set_elements(AAZObjectType, "."))
 
             network_interface_configurations = _builder.get(".properties.virtualMachineProfile.networkProfile.networkInterfaceConfigurations")
             if network_interface_configurations is not None:
@@ -2695,6 +3039,7 @@ class Update(AAZCommand):
 
             _elements = _builder.get(".properties.virtualMachineProfile.networkProfile.networkInterfaceConfigurations[].properties.ipConfigurations[].properties.publicIPAddressConfiguration.properties.ipTags[]")
             if _elements is not None:
+                _elements.set_prop("firstPartyServiceTagId", AAZStrType, ".first_party_service_tag_id")
                 _elements.set_prop("ipTagType", AAZStrType, ".ip_tag_type")
                 _elements.set_prop("tag", AAZStrType, ".tag")
 
@@ -2876,6 +3221,7 @@ class Update(AAZCommand):
             storage_profile = _builder.get(".properties.virtualMachineProfile.storageProfile")
             if storage_profile is not None:
                 storage_profile.set_prop("dataDisks", AAZListType, ".data_disks")
+                storage_profile.set_prop("diskApiVersion", AAZStrType, ".disk_api_version")
                 storage_profile.set_prop("diskControllerType", AAZStrType, ".disk_controller_type")
                 storage_profile.set_prop("imageReference", AAZObjectType, ".image_reference")
                 storage_profile.set_prop("osDisk", AAZObjectType, ".os_disk")
@@ -2895,6 +3241,7 @@ class Update(AAZCommand):
                 _elements.set_prop("lun", AAZIntType, ".lun", typ_kwargs={"flags": {"required": True}})
                 _UpdateHelper._build_schema_virtual_machine_scale_set_managed_disk_parameters_update(_elements.set_prop("managedDisk", AAZObjectType, ".managed_disk"))
                 _elements.set_prop("name", AAZStrType, ".name")
+                _elements.set_prop("storageFaultDomainAlignment", AAZStrType, ".storage_fault_domain_alignment")
                 _elements.set_prop("writeAcceleratorEnabled", AAZBoolType, ".write_accelerator_enabled")
 
             image_reference = _builder.get(".properties.virtualMachineProfile.storageProfile.imageReference")
@@ -2918,11 +3265,13 @@ class Update(AAZCommand):
                 _UpdateHelper._build_schema_virtual_machine_scale_set_managed_disk_parameters_update(os_disk.set_prop("managedDisk", AAZObjectType, ".managed_disk"))
                 os_disk.set_prop("name", AAZStrType, ".name")
                 os_disk.set_prop("osType", AAZStrType, ".os_type")
+                os_disk.set_prop("storageFaultDomainAlignment", AAZStrType, ".storage_fault_domain_alignment")
                 os_disk.set_prop("vhdContainers", AAZListType, ".vhd_containers")
                 os_disk.set_prop("writeAcceleratorEnabled", AAZBoolType, ".write_accelerator_enabled")
 
             diff_disk_settings = _builder.get(".properties.virtualMachineProfile.storageProfile.osDisk.diffDiskSettings")
             if diff_disk_settings is not None:
+                diff_disk_settings.set_prop("enableFullCaching", AAZBoolType, ".enable_full_caching")
                 diff_disk_settings.set_prop("option", AAZStrType, ".option")
                 diff_disk_settings.set_prop("placement", AAZStrType, ".placement")
 
@@ -2980,6 +3329,7 @@ class _UpdateHelper:
             return
         _builder.set_prop("inVMAccessControlProfileReferenceId", AAZStrType, ".in_vm_access_control_profile_reference_id")
         _builder.set_prop("mode", AAZStrType, ".mode")
+        _builder.set_prop("useLocalFileRules", AAZBoolType, ".use_local_file_rules")
 
     @classmethod
     def _build_schema_sub_resource_update(cls, _builder):
@@ -2991,9 +3341,32 @@ class _UpdateHelper:
     def _build_schema_virtual_machine_scale_set_managed_disk_parameters_update(cls, _builder):
         if _builder is None:
             return
+        _builder.set_prop("additionalDiskProperties", AAZObjectType, ".additional_disk_properties")
         cls._build_schema_disk_encryption_set_parameters_update(_builder.set_prop("diskEncryptionSet", AAZObjectType, ".disk_encryption_set"))
         _builder.set_prop("securityProfile", AAZObjectType, ".security_profile")
         _builder.set_prop("storageAccountType", AAZStrType, ".storage_account_type")
+
+        additional_disk_properties = _builder.get(".additionalDiskProperties")
+        if additional_disk_properties is not None:
+            additional_disk_properties.set_prop("managedDiskProperties", AAZObjectType, ".managed_disk_properties")
+
+        managed_disk_properties = _builder.get(".additionalDiskProperties.managedDiskProperties")
+        if managed_disk_properties is not None:
+            managed_disk_properties.set_prop("availabilityPolicy", AAZObjectType, ".availability_policy")
+            managed_disk_properties.set_prop("burstingEnabled", AAZBoolType, ".bursting_enabled")
+            managed_disk_properties.set_prop("diskAccessId", AAZStrType, ".disk_access_id")
+            managed_disk_properties.set_prop("diskIOPSReadOnly", AAZIntType, ".disk_iops_read_only")
+            managed_disk_properties.set_prop("diskMBpsReadOnly", AAZIntType, ".disk_m_bps_read_only")
+            managed_disk_properties.set_prop("logicalSectorSize", AAZIntType, ".logical_sector_size")
+            managed_disk_properties.set_prop("maxShares", AAZIntType, ".max_shares")
+            managed_disk_properties.set_prop("networkAccessPolicy", AAZStrType, ".network_access_policy")
+            managed_disk_properties.set_prop("optimizedForFrequentAttach", AAZBoolType, ".optimized_for_frequent_attach")
+            managed_disk_properties.set_prop("performancePlus", AAZBoolType, ".performance_plus")
+            managed_disk_properties.set_prop("tier", AAZStrType, ".tier")
+
+        availability_policy = _builder.get(".additionalDiskProperties.managedDiskProperties.availabilityPolicy")
+        if availability_policy is not None:
+            availability_policy.set_prop("actionOnDiskDelay", AAZStrType, ".action_on_disk_delay")
 
         security_profile = _builder.get(".securityProfile")
         if security_profile is not None:
@@ -3037,6 +3410,7 @@ class _UpdateHelper:
         if cls._schema_host_endpoint_settings_read is not None:
             _schema.in_vm_access_control_profile_reference_id = cls._schema_host_endpoint_settings_read.in_vm_access_control_profile_reference_id
             _schema.mode = cls._schema_host_endpoint_settings_read.mode
+            _schema.use_local_file_rules = cls._schema_host_endpoint_settings_read.use_local_file_rules
             return
 
         cls._schema_host_endpoint_settings_read = _schema_host_endpoint_settings_read = AAZObjectType()
@@ -3046,9 +3420,13 @@ class _UpdateHelper:
             serialized_name="inVMAccessControlProfileReferenceId",
         )
         host_endpoint_settings_read.mode = AAZStrType()
+        host_endpoint_settings_read.use_local_file_rules = AAZBoolType(
+            serialized_name="useLocalFileRules",
+        )
 
         _schema.in_vm_access_control_profile_reference_id = cls._schema_host_endpoint_settings_read.in_vm_access_control_profile_reference_id
         _schema.mode = cls._schema_host_endpoint_settings_read.mode
+        _schema.use_local_file_rules = cls._schema_host_endpoint_settings_read.use_local_file_rules
 
     _schema_sub_resource_read = None
 
@@ -3070,6 +3448,7 @@ class _UpdateHelper:
     @classmethod
     def _build_schema_virtual_machine_scale_set_managed_disk_parameters_read(cls, _schema):
         if cls._schema_virtual_machine_scale_set_managed_disk_parameters_read is not None:
+            _schema.additional_disk_properties = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.additional_disk_properties
             _schema.disk_encryption_set = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.disk_encryption_set
             _schema.security_profile = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.security_profile
             _schema.storage_account_type = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.storage_account_type
@@ -3078,6 +3457,9 @@ class _UpdateHelper:
         cls._schema_virtual_machine_scale_set_managed_disk_parameters_read = _schema_virtual_machine_scale_set_managed_disk_parameters_read = AAZObjectType()
 
         virtual_machine_scale_set_managed_disk_parameters_read = _schema_virtual_machine_scale_set_managed_disk_parameters_read
+        virtual_machine_scale_set_managed_disk_parameters_read.additional_disk_properties = AAZObjectType(
+            serialized_name="additionalDiskProperties",
+        )
         virtual_machine_scale_set_managed_disk_parameters_read.disk_encryption_set = AAZObjectType(
             serialized_name="diskEncryptionSet",
         )
@@ -3089,6 +3471,49 @@ class _UpdateHelper:
             serialized_name="storageAccountType",
         )
 
+        additional_disk_properties = _schema_virtual_machine_scale_set_managed_disk_parameters_read.additional_disk_properties
+        additional_disk_properties.managed_disk_properties = AAZObjectType(
+            serialized_name="managedDiskProperties",
+        )
+
+        managed_disk_properties = _schema_virtual_machine_scale_set_managed_disk_parameters_read.additional_disk_properties.managed_disk_properties
+        managed_disk_properties.availability_policy = AAZObjectType(
+            serialized_name="availabilityPolicy",
+        )
+        managed_disk_properties.bursting_enabled = AAZBoolType(
+            serialized_name="burstingEnabled",
+        )
+        managed_disk_properties.disk_access_id = AAZStrType(
+            serialized_name="diskAccessId",
+        )
+        managed_disk_properties.disk_iops_read_only = AAZIntType(
+            serialized_name="diskIOPSReadOnly",
+        )
+        managed_disk_properties.disk_m_bps_read_only = AAZIntType(
+            serialized_name="diskMBpsReadOnly",
+        )
+        managed_disk_properties.logical_sector_size = AAZIntType(
+            serialized_name="logicalSectorSize",
+        )
+        managed_disk_properties.max_shares = AAZIntType(
+            serialized_name="maxShares",
+        )
+        managed_disk_properties.network_access_policy = AAZStrType(
+            serialized_name="networkAccessPolicy",
+        )
+        managed_disk_properties.optimized_for_frequent_attach = AAZBoolType(
+            serialized_name="optimizedForFrequentAttach",
+        )
+        managed_disk_properties.performance_plus = AAZBoolType(
+            serialized_name="performancePlus",
+        )
+        managed_disk_properties.tier = AAZStrType()
+
+        availability_policy = _schema_virtual_machine_scale_set_managed_disk_parameters_read.additional_disk_properties.managed_disk_properties.availability_policy
+        availability_policy.action_on_disk_delay = AAZStrType(
+            serialized_name="actionOnDiskDelay",
+        )
+
         security_profile = _schema_virtual_machine_scale_set_managed_disk_parameters_read.security_profile
         security_profile.disk_encryption_set = AAZObjectType(
             serialized_name="diskEncryptionSet",
@@ -3098,6 +3523,7 @@ class _UpdateHelper:
             serialized_name="securityEncryptionType",
         )
 
+        _schema.additional_disk_properties = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.additional_disk_properties
         _schema.disk_encryption_set = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.disk_encryption_set
         _schema.security_profile = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.security_profile
         _schema.storage_account_type = cls._schema_virtual_machine_scale_set_managed_disk_parameters_read.storage_account_type
@@ -3227,6 +3653,9 @@ class _UpdateHelper:
         properties.do_not_run_extensions_on_overprovisioned_v_ms = AAZBoolType(
             serialized_name="doNotRunExtensionsOnOverprovisionedVMs",
         )
+        properties.external_health_policy = AAZObjectType(
+            serialized_name="externalHealthPolicy",
+        )
         properties.high_speed_interconnect_placement = AAZStrType(
             serialized_name="highSpeedInterconnectPlacement",
         )
@@ -3234,6 +3663,9 @@ class _UpdateHelper:
             serialized_name="hostGroup",
         )
         cls._build_schema_sub_resource_read(properties.host_group)
+        properties.lifecycle_hooks_profile = AAZObjectType(
+            serialized_name="lifecycleHooksProfile",
+        )
         properties.orchestration_mode = AAZStrType(
             serialized_name="orchestrationMode",
         )
@@ -3311,6 +3743,32 @@ class _UpdateHelper:
             serialized_name="repairAction",
         )
 
+        external_health_policy = _schema_virtual_machine_scale_set_read.properties.external_health_policy
+        external_health_policy.enabled = AAZBoolType()
+        external_health_policy.expiry_duration = AAZStrType(
+            serialized_name="expiryDuration",
+        )
+        external_health_policy.grace_period = AAZStrType(
+            serialized_name="gracePeriod",
+        )
+
+        lifecycle_hooks_profile = _schema_virtual_machine_scale_set_read.properties.lifecycle_hooks_profile
+        lifecycle_hooks_profile.lifecycle_hooks = AAZListType(
+            serialized_name="lifecycleHooks",
+        )
+
+        lifecycle_hooks = _schema_virtual_machine_scale_set_read.properties.lifecycle_hooks_profile.lifecycle_hooks
+        lifecycle_hooks.Element = AAZObjectType()
+
+        _element = _schema_virtual_machine_scale_set_read.properties.lifecycle_hooks_profile.lifecycle_hooks.Element
+        _element.default_action = AAZStrType(
+            serialized_name="defaultAction",
+        )
+        _element.type = AAZStrType()
+        _element.wait_duration = AAZStrType(
+            serialized_name="waitDuration",
+        )
+
         priority_mix_policy = _schema_virtual_machine_scale_set_read.properties.priority_mix_policy
         priority_mix_policy.base_regular_priority_count = AAZIntType(
             serialized_name="baseRegularPriorityCount",
@@ -3322,6 +3780,9 @@ class _UpdateHelper:
         resiliency_policy = _schema_virtual_machine_scale_set_read.properties.resiliency_policy
         resiliency_policy.automatic_zone_rebalancing_policy = AAZObjectType(
             serialized_name="automaticZoneRebalancingPolicy",
+        )
+        resiliency_policy.operation_recovery_settings = AAZObjectType(
+            serialized_name="operationRecoverySettings",
         )
         resiliency_policy.resilient_vm_creation_policy = AAZObjectType(
             serialized_name="resilientVMCreationPolicy",
@@ -3341,6 +3802,26 @@ class _UpdateHelper:
         automatic_zone_rebalancing_policy.rebalance_strategy = AAZStrType(
             serialized_name="rebalanceStrategy",
         )
+
+        operation_recovery_settings = _schema_virtual_machine_scale_set_read.properties.resiliency_policy.operation_recovery_settings
+        operation_recovery_settings.reimage_recovery_policy = AAZObjectType(
+            serialized_name="reimageRecoveryPolicy",
+        )
+        operation_recovery_settings.restart_recovery_policy = AAZObjectType(
+            serialized_name="restartRecoveryPolicy",
+        )
+        operation_recovery_settings.start_recovery_policy = AAZObjectType(
+            serialized_name="startRecoveryPolicy",
+        )
+
+        reimage_recovery_policy = _schema_virtual_machine_scale_set_read.properties.resiliency_policy.operation_recovery_settings.reimage_recovery_policy
+        reimage_recovery_policy.enabled = AAZBoolType()
+
+        restart_recovery_policy = _schema_virtual_machine_scale_set_read.properties.resiliency_policy.operation_recovery_settings.restart_recovery_policy
+        restart_recovery_policy.enabled = AAZBoolType()
+
+        start_recovery_policy = _schema_virtual_machine_scale_set_read.properties.resiliency_policy.operation_recovery_settings.start_recovery_policy
+        start_recovery_policy.enabled = AAZBoolType()
 
         resilient_vm_creation_policy = _schema_virtual_machine_scale_set_read.properties.resiliency_policy.resilient_vm_creation_policy
         resilient_vm_creation_policy.enabled = AAZBoolType()
@@ -3416,9 +3897,15 @@ class _UpdateHelper:
         sku_profile.allocation_strategy = AAZStrType(
             serialized_name="allocationStrategy",
         )
+        sku_profile.automatic_sku_migration_policy = AAZObjectType(
+            serialized_name="automaticSkuMigrationPolicy",
+        )
         sku_profile.vm_sizes = AAZListType(
             serialized_name="vmSizes",
         )
+
+        automatic_sku_migration_policy = _schema_virtual_machine_scale_set_read.properties.sku_profile.automatic_sku_migration_policy
+        automatic_sku_migration_policy.enabled = AAZBoolType()
 
         vm_sizes = _schema_virtual_machine_scale_set_read.properties.sku_profile.vm_sizes
         vm_sizes.Element = AAZObjectType()
@@ -3504,6 +3991,9 @@ class _UpdateHelper:
         virtual_machine_profile.hardware_profile = AAZObjectType(
             serialized_name="hardwareProfile",
         )
+        virtual_machine_profile.interconnect_block_profile = AAZObjectType(
+            serialized_name="interconnectBlockProfile",
+        )
         virtual_machine_profile.license_type = AAZStrType(
             serialized_name="licenseType",
         )
@@ -3572,6 +4062,9 @@ class _UpdateHelper:
             serialized_name="capacityReservationGroup",
         )
         cls._build_schema_sub_resource_read(capacity_reservation.capacity_reservation_group)
+        capacity_reservation.disable_capacity_reservation_assignment = AAZBoolType(
+            serialized_name="disableCapacityReservationAssignment",
+        )
 
         diagnostics_profile = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.diagnostics_profile
         diagnostics_profile.boot_diagnostics = AAZObjectType(
@@ -3653,6 +4146,9 @@ class _UpdateHelper:
         provision_after_extensions.Element = AAZStrType()
 
         hardware_profile = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.hardware_profile
+        hardware_profile.processor_mode = AAZStrType(
+            serialized_name="processorMode",
+        )
         hardware_profile.vm_size_properties = AAZObjectType(
             serialized_name="vmSizeProperties",
         )
@@ -3665,17 +4161,37 @@ class _UpdateHelper:
             serialized_name="vCPUsPerCore",
         )
 
+        interconnect_block_profile = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.interconnect_block_profile
+        interconnect_block_profile.interconnect_block = AAZObjectType(
+            serialized_name="interconnectBlock",
+        )
+        cls._build_schema_api_entity_reference_read(interconnect_block_profile.interconnect_block)
+
         network_profile = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.network_profile
         network_profile.health_probe = AAZObjectType(
             serialized_name="healthProbe",
         )
         cls._build_schema_api_entity_reference_read(network_profile.health_probe)
+        network_profile.interconnect_group_profile = AAZObjectType(
+            serialized_name="interconnectGroupProfile",
+        )
         network_profile.network_api_version = AAZStrType(
             serialized_name="networkApiVersion",
         )
         network_profile.network_interface_configurations = AAZListType(
             serialized_name="networkInterfaceConfigurations",
         )
+
+        interconnect_group_profile = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.network_profile.interconnect_group_profile
+        interconnect_group_profile.interconnect_group = AAZObjectType(
+            serialized_name="interconnectGroup",
+        )
+        cls._build_schema_sub_resource_read(interconnect_group_profile.interconnect_group)
+        interconnect_group_profile.subgroups = AAZListType()
+
+        subgroups = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.network_profile.interconnect_group_profile.subgroups
+        subgroups.Element = AAZObjectType()
+        cls._build_schema_sub_resource_read(subgroups.Element)
 
         network_interface_configurations = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.network_profile.network_interface_configurations
         network_interface_configurations.Element = AAZObjectType()
@@ -3826,6 +4342,9 @@ class _UpdateHelper:
         ip_tags.Element = AAZObjectType()
 
         _element = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.network_profile.network_interface_configurations.Element.properties.ip_configurations.Element.properties.public_ip_address_configuration.properties.ip_tags.Element
+        _element.first_party_service_tag_id = AAZStrType(
+            serialized_name="firstPartyServiceTagId",
+        )
         _element.ip_tag_type = AAZStrType(
             serialized_name="ipTagType",
         )
@@ -4100,6 +4619,9 @@ class _UpdateHelper:
         storage_profile.data_disks = AAZListType(
             serialized_name="dataDisks",
         )
+        storage_profile.disk_api_version = AAZStrType(
+            serialized_name="diskApiVersion",
+        )
         storage_profile.disk_controller_type = AAZStrType(
             serialized_name="diskControllerType",
         )
@@ -4139,6 +4661,9 @@ class _UpdateHelper:
         )
         cls._build_schema_virtual_machine_scale_set_managed_disk_parameters_read(_element.managed_disk)
         _element.name = AAZStrType()
+        _element.storage_fault_domain_alignment = AAZStrType(
+            serialized_name="storageFaultDomainAlignment",
+        )
         _element.write_accelerator_enabled = AAZBoolType(
             serialized_name="writeAcceleratorEnabled",
         )
@@ -4184,6 +4709,9 @@ class _UpdateHelper:
         os_disk.os_type = AAZStrType(
             serialized_name="osType",
         )
+        os_disk.storage_fault_domain_alignment = AAZStrType(
+            serialized_name="storageFaultDomainAlignment",
+        )
         os_disk.vhd_containers = AAZListType(
             serialized_name="vhdContainers",
         )
@@ -4192,6 +4720,9 @@ class _UpdateHelper:
         )
 
         diff_disk_settings = _schema_virtual_machine_scale_set_read.properties.virtual_machine_profile.storage_profile.os_disk.diff_disk_settings
+        diff_disk_settings.enable_full_caching = AAZBoolType(
+            serialized_name="enableFullCaching",
+        )
         diff_disk_settings.option = AAZStrType()
         diff_disk_settings.placement = AAZStrType()
 
